@@ -1,0 +1,61 @@
+#!/bin/sh
+ 
+############################################################################################
+###   Title: 210811-Script-SequenceMap.sh             
+###   Author: Jacqueline Barry
+###   Date: April, 2021
+###   BIOL6950: Functional Genomics, Auburn University
+##############################################################################################
+
+module load hisat2
+module load python/2.7.1
+module load samtools
+
+#  Set the stack size to unlimited
+ulimit -s unlimited
+
+# Turn echo on so all commands are echoed in the output log
+set -x
+
+DATADIR=/scratch/aubclsa0103/BuzzardProject/Cleaned 
+REFDIR=/scratch/aubclsa0103/BuzzardProject/RawData
+OUTDIR=/scratch/aubclsa0103/BuzzardProject/Mapped
+
+REF=ButeoJaponicusGenomic
+PAIR=ERR441003
+
+mkdir -p $OUTDIR
+mkdir -p $RESULTSDIR
+
+##################  Prepare the Reference Index for mapping with HiSat2   #############################
+#### We index the file
+ 
+######  Move to $REFDIR
+cd $REFDIR
+
+#### Create a HISAT2 index
+hisat2-build $REF.fna $REF_index
+
+########################  Map and Count the Data using HiSAT2 and StringTie  ########################
+# Move to the directory for mapping
+cd $OUTDIR
+
+## HiSat2 is the mapping program
+#  -p indicates number of processors, --dta reports alignments for StringTie --rf is the read orientation
+hisat2 -p 6 --dta --phred33       \
+  -x "$REFDIR"/"$REF"_index       \
+  -1 "$DATADIR"/"$PAIR"_1_paired.fastq  -2 "$DATADIR"/"$PAIR"_2_paired.fastq      \
+  -S "$REF".sam
+
+### view: convert the SAM file into a BAM file  -bS: BAM is the binary format corresponding to the SAM text format.
+samtools view -@ 6 -bS ${REF}.sam > ${REF}.bam  ### This works on ASC
+
+### sort: convert the BAM file to a sorted BAM file.
+samtools sort -@ 6  "$REF".bam    "$REF"_sorted
+
+### Index the BAM and get stats
+samtools flagstat   "$REF"_sorted.bam   > "$REF"_Stats.txt
+
+#####################  Copy Results to home Directory. 
+cp *.txt $RESULTSDIR
+
